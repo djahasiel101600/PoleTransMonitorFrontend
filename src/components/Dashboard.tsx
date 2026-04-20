@@ -86,7 +86,8 @@ export function Dashboard() {
 
   useEffect(() => {
     // Non-admin users cannot access management or users.
-    if (!isAdmin && (activeTab === "management" || activeTab === "users")) setActiveTab("monitoring");
+    if (!isAdmin && (activeTab === "management" || activeTab === "users"))
+      setActiveTab("monitoring");
   }, [isAdmin, activeTab]);
 
   const refreshTransformers = async (preferredId?: number) => {
