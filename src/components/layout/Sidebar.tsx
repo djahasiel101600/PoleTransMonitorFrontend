@@ -2,7 +2,12 @@ import type { ReactNode } from "react";
 import { Badge } from "../ui/Badge";
 import type { Me } from "../../contexts/AuthContext";
 
-export type NavKey = "monitoring" | "alerts" | "reports" | "management" | "users";
+export type NavKey =
+  | "monitoring"
+  | "alerts"
+  | "reports"
+  | "management"
+  | "users";
 
 function NavIcon({ children }: { children: ReactNode }) {
   return (
@@ -27,9 +32,7 @@ export function Sidebar({
   me: Me | null;
   onLogout: () => void;
 }) {
-  const initials = me?.username
-    ? me.username.slice(0, 2).toUpperCase()
-    : "?";
+  const initials = me?.username ? me.username.slice(0, 2).toUpperCase() : "?";
 
   return (
     <nav className="flex h-full flex-col gap-1 p-3">

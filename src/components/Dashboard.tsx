@@ -65,7 +65,9 @@ export function Dashboard() {
   const unacknowledgedCount = alerts.filter((a) => !a.acknowledged).length;
   const [showAddTransformer, setShowAddTransformer] = useState(false);
   const [transformerQuery, setTransformerQuery] = useState("");
-  const [managementTab, setManagementTab] = useState<"transformers" | "contacts">("transformers");
+  const [managementTab, setManagementTab] = useState<
+    "transformers" | "contacts"
+  >("transformers");
 
   const [editTransformer, setEditTransformer] = useState<Transformer | null>(
     null,
@@ -278,17 +280,27 @@ export function Dashboard() {
             </div>
           ) : activeTab === "reports" ? (
             <div>
-              <PageHeader title="Reports" subtitle="Historical data and export" />
+              <PageHeader
+                title="Reports"
+                subtitle="Historical data and export"
+              />
               <ReportsView transformerId={selectedId} />
             </div>
           ) : activeTab === "users" ? (
             <div>
-              <PageHeader title="Users" subtitle="Manage user access and approvals" />
+              <PageHeader
+                title="Users"
+                subtitle="Manage user access and approvals"
+              />
               <UserManagementScreen />
             </div>
           ) : (
             /* management tab */
-            <div role="tabpanel" id="tabpanel-management" aria-labelledby="tab-management">
+            <div
+              role="tabpanel"
+              id="tabpanel-management"
+              aria-labelledby="tab-management"
+            >
               <PageHeader
                 title="Management"
                 subtitle="Transformer configuration and contacts"
@@ -387,7 +399,6 @@ export function Dashboard() {
             </div>
           )}
         </div>
-
       </main>
 
       {isAdmin && (
