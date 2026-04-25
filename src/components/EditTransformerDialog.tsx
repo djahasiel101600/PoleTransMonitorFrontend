@@ -151,8 +151,9 @@ export function EditTransformerDialog({
                         </span>
                       </label>
                       <p className="text-xs text-muted-foreground">
-                        When deactivated, the server rejects incoming readings and
-                        the ESP32 stops sending measurements until reactivated.
+                        When deactivated, the server rejects incoming readings
+                        and the ESP32 stops sending measurements until
+                        reactivated.
                       </p>
                     </div>
 
@@ -161,7 +162,9 @@ export function EditTransformerDialog({
                         <input
                           type="checkbox"
                           checked={pendingOpenPortal}
-                          onChange={(e) => setPendingOpenPortal(e.target.checked)}
+                          onChange={(e) =>
+                            setPendingOpenPortal(e.target.checked)
+                          }
                           className="h-4 w-4"
                         />
                         <span className="text-sm font-medium text-foreground">
@@ -169,9 +172,10 @@ export function EditTransformerDialog({
                         </span>
                       </label>
                       <p className="text-xs text-muted-foreground">
-                        When checked, the ESP32 will open its WiFiManager config portal
-                        on the next device_config sync (within 5 minutes). The flag clears
-                        automatically after the device acknowledges.
+                        When checked, the ESP32 will open its WiFiManager config
+                        portal on the next device_config sync (within 5
+                        minutes). The flag clears automatically after the device
+                        acknowledges.
                       </p>
                     </div>
                   </>
