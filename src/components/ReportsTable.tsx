@@ -183,6 +183,7 @@ function ReadingsTableContent({ readings }: { readings: Reading[] }) {
           <th className={TH}>PF</th>
           <th className={TH}>Freq (Hz)</th>
           <th className={TH}>Energy (kWh)</th>
+          <th className={TH}>Capacity (%)</th>
           <th className={TH}>Condition</th>
         </tr>
       </thead>
@@ -200,6 +201,9 @@ function ReadingsTableContent({ readings }: { readings: Reading[] }) {
             <td className={TD}>{fmtNum(r.power_factor, 3)}</td>
             <td className={TD}>{fmtNum(r.frequency)}</td>
             <td className={TD}>{fmtNum(r.energy_kwh, 4)}</td>
+            <td className={TD}>
+              {r.loading_percent != null ? `${fmtNum(r.loading_percent, 1)} %` : "—"}
+            </td>
             <td className={TD}>
               <ConditionBadge condition={r.condition} />
             </td>

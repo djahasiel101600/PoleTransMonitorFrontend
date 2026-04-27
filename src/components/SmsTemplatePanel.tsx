@@ -18,6 +18,7 @@ const TOKENS: { token: string; label: string }[] = [
   { token: "{energy_kwh}", label: "Energy (kWh)" },
   { token: "{oil_temp}", label: "Oil Temp" },
   { token: "{condition}", label: "Condition" },
+  { token: "{loading_percent}", label: "Capacity Used %" },
 ];
 
 // Sample values used for the live preview (no network call required)
@@ -32,6 +33,7 @@ const SAMPLE: Record<string, string> = {
   "{energy_kwh}": "123.45",
   "{oil_temp}": "47.2",
   "{condition}": "heavy_load",
+  "{loading_percent}": "41.4",
 };
 
 function renderPreview(tpl: string): string {

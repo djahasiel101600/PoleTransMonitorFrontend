@@ -56,6 +56,7 @@ export interface Reading {
   power_factor: number | null;
   frequency: number | null;
   energy_kwh: number | null;
+  loading_percent: number | null;
   condition: Condition;
 }
 
