@@ -48,17 +48,6 @@ function isValidNum(v: number | null | undefined): v is number {
   return v != null && !Number.isNaN(v) && isFinite(v);
 }
 
-function formatTime(t: string) {
-  return new Date(t).toLocaleTimeString([], {
-    hour: "2-digit",
-    minute: "2-digit",
-  });
-}
-
-function formatTooltipTime(t: string) {
-  return new Date(t).toLocaleString();
-}
-
 /** Convert a local datetime-input value (YYYY-MM-DDTHH:mm) to ISO string */
 function localInputToISO(value: string): string {
   return new Date(value).toISOString();
@@ -169,22 +158,24 @@ export function SingleMetricChart({
             value = raw;
           }
         }
-        return { time: r.timestamp, value };
+        // Use numeric ms timestamp so ReferenceLine x can be positioned freely
+        return { time: new Date(r.timestamp).getTime(), value };
       }),
     [readings, dataKey, validRange],
   );
 
-  // Alerts that fall within the visible time window
+  // Alerts that fall within the visible time window.
+  // chartData.time is already in ms; alert timestamps are converted to ms for comparison.
   const visibleAlerts = useMemo(() => {
     if (!showAlertMarkers || alerts.length === 0 || chartData.length === 0) return [];
-    const times = chartData.map((d) => new Date(d.time).getTime());
-    const minT = Math.min(...times);
-    const maxT = Math.max(...times);
+    const minT = Math.min(...chartData.map((d) => d.time));
+    const maxT = Math.max(...chartData.map((d) => d.time));
     return alerts.filter((a) => {
       const t = new Date(a.timestamp).getTime();
-      return t >= minT && t <= maxT;
+      // eslint-disable-next-line eqeqeq
+      return a.transformer == transformerId && t >= minT && t <= maxT;
     });
-  }, [alerts, chartData, showAlertMarkers]);
+  }, [alerts, chartData, showAlertMarkers, transformerId]);
 
   const hasData = chartData.some((d) => d.value != null);
   const label = unit ? `${title} (${unit})` : title;
@@ -345,7 +336,12 @@ export function SingleMetricChart({
                 />
                 <XAxis
                   dataKey="time"
-                  tickFormatter={formatTime}
+                  type="number"
+                  scale="time"
+                  domain={["auto", "auto"]}
+                  tickFormatter={(ms: number) =>
+                    new Date(ms).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })
+                  }
                   tick={{ fontSize: 11 }}
                   stroke="currentColor"
                   className="text-muted-foreground"
@@ -357,8 +353,8 @@ export function SingleMetricChart({
                   domain={yDomain ?? ["auto", "auto"]}
                 />
                 <Tooltip
-                  labelFormatter={(value) =>
-                    formatTooltipTime(String(value ?? ""))
+                  labelFormatter={(ms: number) =>
+                    new Date(ms).toLocaleString()
                   }
                   formatter={(value) => [
                     unit ? `${value} ${unit}` : value,
@@ -380,7 +376,7 @@ export function SingleMetricChart({
                 {visibleAlerts.map((alert) => (
                   <ReferenceLine
                     key={alert.id}
-                    x={alert.timestamp}
+                    x={new Date(alert.timestamp).getTime()}
                     stroke={CONDITION_COLORS[alert.condition] ?? "#94a3b8"}
                     strokeDasharray="4 3"
                     strokeWidth={1.5}
