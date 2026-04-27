@@ -353,8 +353,8 @@ export function SingleMetricChart({
                   domain={yDomain ?? ["auto", "auto"]}
                 />
                 <Tooltip
-                  labelFormatter={(ms: number) =>
-                    new Date(ms).toLocaleString()
+                  labelFormatter={(ms) =>
+                    new Date(Number(ms)).toLocaleString()
                   }
                   formatter={(value) => [
                     unit ? `${value} ${unit}` : value,
