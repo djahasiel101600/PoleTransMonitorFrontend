@@ -110,10 +110,11 @@ export async function fetchTransformers() {
   return res.json();
 }
 
-export async function fetchReadings(transformerId: number, since?: string) {
+export async function fetchReadings(transformerId: number, since?: string, until?: string) {
   const params = new URLSearchParams();
   params.set("transformer", String(transformerId));
   if (since) params.set("since", since);
+  if (until) params.set("until", until);
   const res = await authFetch(`${API_BASE}/readings/?${params}`, {});
   if (!res.ok) throw new Error("Failed to fetch readings");
   return res.json();

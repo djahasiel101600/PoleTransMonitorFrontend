@@ -91,6 +91,7 @@ export function Dashboard() {
 
   const [activeTab, setActiveTab] = useState<NavKey>("monitoring");
   const [mobileNavOpen, setMobileNavOpen] = useState(false);
+  const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
   const [showRegister, setShowRegister] = useState(false);
   const { toasts, toast, dismiss } = useToast();
 
@@ -220,7 +221,7 @@ export function Dashboard() {
       <Dialog open={mobileNavOpen} onOpenChange={setMobileNavOpen}>
         <DialogPortal>
           <DialogOverlay />
-          <DialogContent className="left-0 top-0 max-w-[min(86vw,20rem)] -translate-x-0 -translate-y-0 rounded-none p-0">
+          <DialogContent className="left-0 top-0 max-w-[min(86vw,20rem)] translate-x-0 translate-y-0 rounded-none p-0">
             <Sidebar
               active={activeTab}
               isAdmin={isAdmin}
@@ -238,10 +239,10 @@ export function Dashboard() {
 
       <main className="flex gap-4 px-3 py-6 sm:gap-6 sm:px-4 md:px-6 lg:px-8">
         <aside
-          className="hidden w-72 shrink-0 lg:block"
+          className={`hidden shrink-0 lg:block transition-all duration-200 ${sidebarCollapsed ? "w-15" : "w-72"}`}
           aria-label="Sidebar navigation"
         >
-          <div className="sticky top-[4.25rem] h-[calc(100vh-4.25rem)] overflow-y-auto rounded-lg border border-border/80 bg-card">
+          <div className="sticky top-17 h-[calc(100vh-4.25rem)] overflow-y-auto rounded-lg border border-border/80 bg-card">
             <Sidebar
               active={activeTab}
               isAdmin={isAdmin}
@@ -249,6 +250,8 @@ export function Dashboard() {
               me={me}
               onLogout={logout}
               onNavigate={(key) => setActiveTab(key)}
+              collapsed={sidebarCollapsed}
+              onToggleCollapse={() => setSidebarCollapsed((c) => !c)}
             />
           </div>
         </aside>

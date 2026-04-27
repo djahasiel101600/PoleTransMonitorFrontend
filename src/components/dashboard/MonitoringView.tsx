@@ -181,14 +181,14 @@ export function MonitoringView({
         </div>
 
         <div className="grid gap-4 md:gap-5 grid-cols-1 lg:grid-cols-2">
-          <VoltageChart transformerId={selectedId} />
-          <CurrentChart transformerId={selectedId} />
-          <ApparentPowerChart transformerId={selectedId} />
-          <RealPowerChart transformerId={selectedId} />
-          <PowerFactorChart transformerId={selectedId} />
-          <FrequencyChart transformerId={selectedId} />
+          <VoltageChart transformerId={selectedId} alerts={alerts} />
+          <CurrentChart transformerId={selectedId} alerts={alerts} />
+          <ApparentPowerChart transformerId={selectedId} alerts={alerts} />
+          <RealPowerChart transformerId={selectedId} alerts={alerts} />
+          <PowerFactorChart transformerId={selectedId} alerts={alerts} />
+          <FrequencyChart transformerId={selectedId} alerts={alerts} />
           <div className="lg:col-span-2">
-            <EnergyChart transformerId={selectedId} />
+            <EnergyChart transformerId={selectedId} alerts={alerts} />
           </div>
         </div>
 
