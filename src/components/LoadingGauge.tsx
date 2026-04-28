@@ -16,11 +16,11 @@ export const LoadingGauge = memo(function LoadingGauge({
     return (
       <div
         className="flex flex-col items-center justify-center"
-        style={{ width: size, height: size / 2 + 24 }}
+        style={{ width: size, height: size / 2 + 32 }}
       >
-        <svg viewBox="0 0 120 84" className="w-full max-w-[120px]" aria-hidden>
+        <svg viewBox="0 0 120 68" className="w-full max-w-30" aria-hidden>
           <path
-            d="M 12 72 A 48 48 0 0 1 108 72"
+            d="M 12 56 A 48 48 0 0 1 108 56"
             fill="none"
             stroke="currentColor"
             strokeWidth="8"
@@ -49,7 +49,7 @@ export const LoadingGauge = memo(function LoadingGauge({
 
   const r = 48;
   const cx = 60;
-  const cy = 72;
+  const cy = 56;
   const startAngle = 180;
   const endAngle = 180 - (percent / 100) * 180;
   const rad = (deg: number) => (deg * Math.PI) / 180;
@@ -64,11 +64,11 @@ export const LoadingGauge = memo(function LoadingGauge({
   return (
     <div
       className="flex flex-col items-center justify-center"
-      style={{ width: size, height: size / 2 + 28 }}
+      style={{ width: size, height: size / 2 + 32 }}
       role="img"
       aria-label={`${label}: ${value.toFixed(1)}%`}
     >
-      <svg viewBox="0 0 120 84" className="w-full max-w-[120px]" aria-hidden>
+      <svg viewBox="0 0 120 68" className="w-full max-w-30" aria-hidden>
         <path
           d={trackD}
           fill="none"
