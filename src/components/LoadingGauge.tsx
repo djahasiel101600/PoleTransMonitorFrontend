@@ -1,100 +1,119 @@
 import { memo } from "react";
+import {
+  RadialBarChart,
+  RadialBar,
+  PolarGrid,
+  PolarRadiusAxis,
+  Label,
+} from "recharts";
+import { ChartContainer } from "./ui/ChartContainer";
 
-/**
- * Semicircular gauge for loading % (0–100+).
- *
- * SVG geometry (all in SVG user units, viewBox "0 0 120 62"):
- *   r = 46   — arc radius
- *   cx = 60  — horizontal centre
- *   cy = 51  — arc baseline  (= r + strokeWidth/2 = 46+5, so the topmost
- *              stroke edge sits exactly at y=0 with no dead space)
- *   strokeWidth = 10
- *   Arc endpoints: (14, 51) → (106, 51)
- *   ViewBox height = cy + strokeWidth/2 = 51 + 5 = 56  (+6 bottom padding = 62)
- */
-const R = 46;
-const CX = 60;
-const CY = 51;
-const SW = 10;
-const VBOX = "0 0 120 62";
-const TRACK = `M ${CX - R} ${CY} A ${R} ${R} 0 0 1 ${CX + R} ${CY}`;
-
-function arcPath(percent: number): string {
-  const clamped = Math.min(Math.max(percent, 0), 100);
-  if (clamped <= 0) return "";
-  const rad = (deg: number) => (deg * Math.PI) / 180;
-  // Start at the left endpoint (180°), sweep clockwise to endAngle.
-  const endAngle = 180 - clamped * 1.8; // 0% → 180°, 100% → 0°
-  const x1 = CX + R * Math.cos(rad(180));
-  const y1 = CY - R * Math.sin(rad(180));
-  const x2 = CX + R * Math.cos(rad(endAngle));
-  const y2 = CY - R * Math.sin(rad(endAngle));
-  const large = clamped > 50 ? 1 : 0;
-  return `M ${x1} ${y1} A ${R} ${R} 0 ${large} 1 ${x2} ${y2}`;
-}
-
+/** Radial gauge for transformer loading % (0–100+). */
 export const LoadingGauge = memo(function LoadingGauge({
   value,
   max = 125,
   label = "Loading",
-  size = 120,
+  size = 160,
 }: {
   value: number | null;
   max?: number;
   label?: string;
   size?: number;
 }) {
-  if (value == null || Number.isNaN(value)) {
-    return (
-      <div className="flex flex-col items-center gap-1" style={{ width: size }}>
-        <svg viewBox={VBOX} width={size} aria-hidden>
-          <path d={TRACK} fill="none" stroke="currentColor" strokeWidth={SW} className="text-muted" />
-        </svg>
-        <span className="text-lg font-semibold tabular-nums text-muted-foreground">--</span>
-        <span className="text-[10px] uppercase tracking-wider text-muted-foreground">{label}</span>
-      </div>
-    );
-  }
+  const status =
+    value == null || Number.isNaN(value)
+      ? "normal"
+      : value <= 100
+        ? "normal"
+        : value <= 125
+          ? "warning"
+          : "critical";
 
-  const percent = Math.min(value, max);
-  const status = value <= 100 ? "normal" : value <= 125 ? "warning" : "critical";
-  const strokeColor =
+  const color =
     status === "critical"
-      ? "var(--color-critical)"
+      ? "var(--color-critical, #ef4444)"
       : status === "warning"
-        ? "var(--color-warning)"
-        : "var(--color-primary)";
+        ? "var(--color-warning, #f59e0b)"
+        : "var(--color-primary, #14b8a6)";
+
+  // Map value (0–max) to an arc end angle (0–360).
+  const safeValue = value != null && !Number.isNaN(value) ? value : 0;
+  const endAngle = Math.min((safeValue / max) * 360, 360);
+
+  const chartData = [{ name: "loading", value: safeValue, fill: color }];
+  const config = { loading: { label, color } };
+
+  const displayText =
+    value == null || Number.isNaN(value)
+      ? "--"
+      : `${value > 99.9 ? value.toFixed(0) : value.toFixed(1)}%`;
 
   return (
     <div
-      className="flex flex-col items-center gap-1"
-      style={{ width: size }}
+      className="flex flex-col items-center"
       role="img"
-      aria-label={`${label}: ${value.toFixed(1)}%`}
+      aria-label={`${label}: ${displayText}`}
     >
-      <svg viewBox={VBOX} width={size} aria-hidden>
-        <path d={TRACK} fill="none" stroke="currentColor" strokeWidth={SW} className="text-muted" />
-        <path
-          d={arcPath(percent)}
-          fill="none"
-          stroke={strokeColor}
-          strokeWidth={SW}
-          strokeLinecap="round"
-          className="transition-all duration-500"
-        />
-      </svg>
-      <span
-        className={`text-xl font-bold tabular-nums leading-none ${
-          status === "critical"
-            ? "text-red-600 dark:text-red-400"
-            : status === "warning"
-              ? "text-amber-600 dark:text-amber-400"
-              : "text-foreground"
-        }`}
+      <ChartContainer
+        config={config}
+        className="mx-auto"
+        style={{ width: size, height: size } as React.CSSProperties}
       >
-        {value > 99.9 ? value.toFixed(0) : value.toFixed(1)}%
-      </span>
-      <span className="text-[10px] uppercase tracking-wider text-muted-foreground">{label}</span>
+        <RadialBarChart
+          width={size}
+          height={size}
+          data={chartData}
+          startAngle={90}
+          endAngle={90 - endAngle}
+          outerRadius={size / 2 - 10}
+          innerRadius={size / 2 - 26}
+        >
+          <PolarGrid
+            gridType="circle"
+            radialLines={false}
+            stroke="none"
+            className="first:fill-muted last:fill-background"
+            polarRadius={[size / 2 - 10, size / 2 - 26]}
+          />
+          <RadialBar dataKey="value" background cornerRadius={6} />
+          <PolarRadiusAxis tick={false} tickLine={false} axisLine={false}>
+            <Label
+              content={({ viewBox }) => {
+                if (viewBox && "cx" in viewBox && "cy" in viewBox) {
+                  const cx = viewBox.cx as number;
+                  const cy = viewBox.cy as number;
+                  return (
+                    <text textAnchor="middle" dominantBaseline="middle">
+                      <tspan
+                        x={cx}
+                        y={cy}
+                        className={`font-bold tabular-nums ${
+                          status === "critical"
+                            ? "fill-red-600 dark:fill-red-400"
+                            : status === "warning"
+                              ? "fill-amber-600 dark:fill-amber-400"
+                              : "fill-foreground"
+                        }`}
+                        fontSize={size / 6}
+                      >
+                        {displayText}
+                      </tspan>
+                      <tspan
+                        x={cx}
+                        y={cy + size / 10}
+                        className="fill-muted-foreground"
+                        fontSize={size / 12}
+                      >
+                        {label}
+                      </tspan>
+                    </text>
+                  );
+                }
+              }}
+            />
+          </PolarRadiusAxis>
+        </RadialBarChart>
+      </ChartContainer>
     </div>
   );
 });
