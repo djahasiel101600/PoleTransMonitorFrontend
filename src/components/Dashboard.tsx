@@ -56,10 +56,20 @@ export function Dashboard() {
   const isAuthenticated = me != null;
   const isAuthenticating = !!accessToken && !isAuthenticated;
 
-  const { reading: wsReading, deviceOnline } = useMonitorWebSocket(
+  const { reading: wsReading, deviceOnline, newAlert } = useMonitorWebSocket(
     isAuthenticated ? selectedId : null,
     accessToken,
   );
+
+  // Prepend live alerts pushed over WebSocket into the alerts list.
+  useEffect(() => {
+    if (!newAlert) return;
+    setAlerts((prev) => {
+      if (prev.some((a) => a.id === newAlert.id)) return prev; // deduplicate
+      return [newAlert, ...prev];
+    });
+    toast(`New alert: ${newAlert.condition.replace(/_/g, " ")}`, "warning");
+  }, [newAlert]);
 
   const displayReading = wsReading ?? latestReading;
   const selectedTransformer = transformers.find((t) => t.id === selectedId);

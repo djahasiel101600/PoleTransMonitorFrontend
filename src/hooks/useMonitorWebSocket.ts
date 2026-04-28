@@ -1,12 +1,13 @@
 import { useEffect, useRef, useState, useCallback } from "react";
 import { refreshAccessToken, isTokenExpired } from "../api/client";
-import type { Reading } from "../types";
+import type { Alert, Reading } from "../types";
 
 /** If no reading arrives within this window, mark the device as stale. */
 const DEVICE_STALE_MS = 60_000; // 3× the 5s sample interval
 
 export function useMonitorWebSocket(transformerId: number | null, accessToken?: string | null) {
   const [reading, setReading] = useState<Reading | null>(null);
+  const [newAlert, setNewAlert] = useState<Alert | null>(null);
   const [connected, setConnected] = useState(false);
   /** True when the WebSocket is open AND the device has sent a reading recently. */
   const [deviceOnline, setDeviceOnline] = useState(false);
@@ -104,6 +105,8 @@ export function useMonitorWebSocket(transformerId: number | null, accessToken?: 
           if (data.type === "reading_update" && data.reading) {
             setReading(data.reading);
             resetStaleTimer();
+          } else if (data.type === "alert_created" && data.alert) {
+            setNewAlert(data.alert as Alert);
           }
         } catch {
           // ignore
@@ -122,5 +125,5 @@ export function useMonitorWebSocket(transformerId: number | null, accessToken?: 
     };
   }, [transformerId, accessToken, resetStaleTimer, resolveAccessToken, resolveWsBase]);
 
-  return { reading, connected, deviceOnline };
+  return { reading, connected, deviceOnline, newAlert };
 }
