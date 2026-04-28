@@ -68,7 +68,7 @@ export function Dashboard() {
       if (prev.some((a) => a.id === newAlert.id)) return prev; // deduplicate
       return [newAlert, ...prev];
     });
-    toast(`New alert: ${newAlert.condition.replace(/_/g, " ")}`, "warning");
+    toast(`New alert: ${newAlert.condition.replace(/_/g, " ")}`, "error");
   }, [newAlert]);
 
   const displayReading = wsReading ?? latestReading;
