@@ -8,6 +8,7 @@ import {
   Tooltip,
   ResponsiveContainer,
   Legend,
+  Brush,
 } from "recharts";
 import { Card, CardContent, CardHeader, CardTitle } from "./ui/Card";
 import type { Reading } from "../types";
@@ -139,7 +140,7 @@ export function ReportsChart({ readings }: { readings: Reading[] }) {
           </div>
         )}
 
-        <div className="h-[300px] w-full">
+        <div className="h-85 w-full">
           <ResponsiveContainer width="100%" height="100%">
             <LineChart
               data={chartData}
@@ -185,6 +186,16 @@ export function ReportsChart({ readings }: { readings: Reading[] }) {
                   />
                 ) : null,
               )}
+              <Brush
+                dataKey="time"
+                height={28}
+                travellerWidth={8}
+                fill="var(--color-card)"
+                stroke="var(--color-border)"
+                tickFormatter={(v: string) =>
+                  new Date(v).toLocaleDateString(undefined, { month: "short", day: "numeric" })
+                }
+              />
             </LineChart>
           </ResponsiveContainer>
         </div>

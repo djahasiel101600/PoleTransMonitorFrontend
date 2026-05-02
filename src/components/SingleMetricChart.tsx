@@ -8,6 +8,7 @@ import {
   Tooltip,
   ResponsiveContainer,
   ReferenceLine,
+  Brush,
 } from "recharts";
 import { Card, CardContent, CardHeader, CardTitle } from "./ui/Card";
 import { Skeleton } from "./ui/Skeleton";
@@ -327,7 +328,7 @@ export function SingleMetricChart({
             </p>
           </div>
         ) : (
-          <div className="h-[clamp(8rem,25vh,14rem)]">
+          <div className="h-[clamp(10rem,30vh,18rem)]">
             <ResponsiveContainer width="100%" height="100%">
               <LineChart data={chartData} margin={CHART_MARGIN}>
                 <CartesianGrid
@@ -388,6 +389,23 @@ export function SingleMetricChart({
                     }}
                   />
                 ))}
+                {chartData.length >= 10 && (
+                  <Brush
+                    dataKey="time"
+                    height={28}
+                    travellerWidth={8}
+                    fill="var(--color-card)"
+                    stroke="var(--color-border)"
+                    tickFormatter={(ms: number) =>
+                      new Date(ms).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })
+                    }
+                    startIndex={
+                      timeRange === "custom"
+                        ? 0
+                        : Math.max(0, Math.floor(chartData.length * 0.75))
+                    }
+                  />
+                )}
               </LineChart>
             </ResponsiveContainer>
           </div>
