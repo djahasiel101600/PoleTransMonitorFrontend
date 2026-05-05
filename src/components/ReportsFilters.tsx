@@ -16,11 +16,12 @@ const ALL_CONDITIONS: { value: Condition; label: string }[] = [
   { value: "critical", label: "Critical" },
 ];
 
-const DATE_PRESETS: { label: string; days: number }[] = [
-  { label: "Last 24h", days: 1 },
-  { label: "Last 7d", days: 7 },
-  { label: "Last 30d", days: 30 },
-  { label: "Last 90d", days: 90 },
+const DATE_PRESETS: { label: string; hours: number }[] = [
+  { label: "Last 1h", hours: 1 },
+  { label: "Last 24h", hours: 24 },
+  { label: "Last 7d", hours: 168 },
+  { label: "Last 30d", hours: 720 },
+  { label: "Last 90d", hours: 2160 },
 ];
 
 export interface FilterValues {
@@ -56,6 +57,7 @@ export function ReportsFilters({
 }) {
   const [filters, setFilters] = useState<FilterValues>(EMPTY_FILTERS);
   const [showAdvanced, setShowAdvanced] = useState(false);
+  const [activePreset, setActivePreset] = useState<number | null>(null);
 
   const set = <K extends keyof FilterValues>(key: K, val: FilterValues[K]) =>
     setFilters((prev) => ({ ...prev, [key]: val }));
@@ -68,24 +70,25 @@ export function ReportsFilters({
         : [...prev.conditions, c],
     }));
 
-  const applyPreset = (days: number) => {
+  const applyPreset = (hours: number) => {
     const end = new Date();
-    const start = new Date(Date.now() - days * 24 * 60 * 60 * 1000);
-    setFilters((prev) => ({
-      ...prev,
+    const start = new Date(Date.now() - hours * 60 * 60 * 1000);
+    setActivePreset(hours);
+    onApply({
+      ...filters,
       startDate: toLocalDatetime(start),
       endDate: toLocalDatetime(end),
-    }));
+    });
   };
 
   const handleReset = () => {
     setFilters(EMPTY_FILTERS);
+    setActivePreset(null);
     onApply(EMPTY_FILTERS);
   };
 
   const activeFilterCount =
-    (filters.startDate ? 1 : 0) +
-    (filters.endDate ? 1 : 0) +
+    (activePreset != null || filters.startDate || filters.endDate ? 1 : 0) +
     filters.conditions.length +
     (filters.voltageMin ? 1 : 0) +
     (filters.voltageMax ? 1 : 0) +
@@ -96,10 +99,34 @@ export function ReportsFilters({
 
   return (
     <div className="space-y-5">
-      {/* Date range section */}
+      {/* Quick Select presets */}
       <div className="rounded-lg border border-border/60 bg-muted/20 p-4">
         <Label className="mb-3 block text-xs font-medium uppercase tracking-wider text-muted-foreground">
-          Date Range
+          Quick Select
+        </Label>
+        <div className="flex flex-wrap gap-1.5">
+          {DATE_PRESETS.map((p) => (
+            <button
+              key={p.hours}
+              type="button"
+              onClick={() => applyPreset(p.hours)}
+              className={[
+                "rounded-md border px-2.5 py-1 text-[11px] font-medium transition-colors",
+                activePreset === p.hours
+                  ? "border-primary/40 bg-primary/10 text-primary"
+                  : "border-border/60 bg-card text-muted-foreground hover:border-primary/30 hover:text-foreground",
+              ].join(" ")}
+            >
+              {p.label}
+            </button>
+          ))}
+        </div>
+      </div>
+
+      {/* Custom date range */}
+      <div className="rounded-lg border border-border/60 bg-muted/20 p-4">
+        <Label className="mb-3 block text-xs font-medium uppercase tracking-wider text-muted-foreground">
+          Custom Range
         </Label>
         <div className="flex flex-wrap items-end gap-3">
           <div className="min-w-[180px] flex-1">
@@ -131,18 +158,10 @@ export function ReportsFilters({
             />
           </div>
         </div>
-        <div className="mt-3 flex flex-wrap gap-1.5">
-          {DATE_PRESETS.map((p) => (
-            <button
-              key={p.days}
-              type="button"
-              onClick={() => applyPreset(p.days)}
-              className="rounded-md border border-border/60 bg-card px-2.5 py-1 text-[11px] font-medium text-muted-foreground transition-colors hover:border-primary/30 hover:text-foreground"
-            >
-              {p.label}
-            </button>
-          ))}
-        </div>
+        <p className="mt-2 text-[11px] text-muted-foreground">
+          Fill in the dates above then press{" "}
+          <span className="font-medium text-foreground">Apply Filters</span>.
+        </p>
       </div>
 
       {/* Condition filter */}
@@ -227,7 +246,10 @@ export function ReportsFilters({
           type="button"
           size="sm"
           disabled={loading}
-          onClick={() => onApply(filters)}
+          onClick={() => {
+            setActivePreset(null);
+            onApply(filters);
+          }}
         >
           {loading ? (
             <span className="flex items-center gap-2">

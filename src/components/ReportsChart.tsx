@@ -1,4 +1,4 @@
-import { useMemo, useState } from "react";
+import { useMemo, useState, useEffect } from "react";
 import {
   LineChart,
   Line,
@@ -13,7 +13,13 @@ import {
 import { Card, CardContent, CardHeader, CardTitle } from "./ui/Card";
 import type { Reading } from "../types";
 
-type Metric = "voltage" | "current" | "apparent_power";
+type Metric =
+  | "voltage"
+  | "current"
+  | "apparent_power"
+  | "real_power"
+  | "power_factor"
+  | "frequency";
 
 const METRIC_CONFIG: Record<
   Metric,
@@ -21,7 +27,10 @@ const METRIC_CONFIG: Record<
 > = {
   voltage: { label: "Voltage", color: "#0d9488", unit: "V" },
   current: { label: "Current", color: "#6366f1", unit: "A" },
-  apparent_power: { label: "Power", color: "#f59e0b", unit: "VA" },
+  apparent_power: { label: "Apparent Power", color: "#f59e0b", unit: "VA" },
+  real_power: { label: "Real Power", color: "#ef4444", unit: "W" },
+  power_factor: { label: "Power Factor", color: "#10b981", unit: "" },
+  frequency: { label: "Frequency", color: "#3b82f6", unit: "Hz" },
 };
 
 const TOOLTIP_STYLE = {
@@ -31,11 +40,24 @@ const TOOLTIP_STYLE = {
 };
 const TOOLTIP_LABEL_STYLE = { color: "var(--color-foreground)" };
 
+const ZOOM_STEP = 0.25; // 25 % zoom per click
+const MIN_WINDOW = 10; // minimum data points visible
+
 export function ReportsChart({ readings }: { readings: Reading[] }) {
   const [visible, setVisible] = useState<Record<Metric, boolean>>({
     voltage: true,
     current: true,
     apparent_power: false,
+    real_power: false,
+    power_factor: false,
+    frequency: false,
+  });
+  const [brushIndices, setBrushIndices] = useState<{
+    start: number;
+    end: number;
+  }>({
+    start: 0,
+    end: 0,
   });
 
   const chartData = useMemo(
@@ -50,9 +72,40 @@ export function ReportsChart({ readings }: { readings: Reading[] }) {
           voltage: r.voltage,
           current: r.current,
           apparent_power: r.apparent_power,
+          real_power: r.real_power,
+          power_factor: r.power_factor,
+          frequency: r.frequency,
         })),
     [readings],
   );
+
+  // Reset brush to full range whenever new data arrives.
+  useEffect(() => {
+    setBrushIndices({ start: 0, end: Math.max(0, chartData.length - 1) });
+  }, [chartData]);
+
+  const handleZoomIn = () => {
+    const len = brushIndices.end - brushIndices.start + 1;
+    if (len <= MIN_WINDOW) return;
+    const shrink = Math.max(1, Math.floor(len * ZOOM_STEP * 0.5));
+    setBrushIndices((prev) => ({
+      start: Math.min(prev.start + shrink, prev.end - MIN_WINDOW + 1),
+      end: Math.max(prev.end - shrink, prev.start + MIN_WINDOW - 1),
+    }));
+  };
+
+  const handleZoomOut = () => {
+    const len = brushIndices.end - brushIndices.start + 1;
+    const expand = Math.max(1, Math.floor(len * ZOOM_STEP * 0.5));
+    setBrushIndices((prev) => ({
+      start: Math.max(0, prev.start - expand),
+      end: Math.min(chartData.length - 1, prev.end + expand),
+    }));
+  };
+
+  const handleZoomReset = () => {
+    setBrushIndices({ start: 0, end: Math.max(0, chartData.length - 1) });
+  };
 
   const stats = useMemo(() => {
     if (!readings.length) return null;
@@ -102,8 +155,68 @@ export function ReportsChart({ readings }: { readings: Reading[] }) {
 
   return (
     <Card className="border-border/80 shadow-none">
-      <CardHeader className="flex flex-row flex-wrap items-center justify-between gap-2 pb-2">
-        <CardTitle className="text-sm font-semibold">Trend Analysis</CardTitle>
+      <CardHeader className="flex flex-col gap-3 pb-2">
+        <div className="flex flex-wrap items-center justify-between gap-2">
+          <CardTitle className="text-sm font-semibold">
+            Trend Analysis
+          </CardTitle>
+          {/* Zoom controls */}
+          <div className="flex items-center gap-1">
+            <button
+              type="button"
+              onClick={handleZoomIn}
+              disabled={brushIndices.end - brushIndices.start + 1 <= MIN_WINDOW}
+              title="Zoom in"
+              className="flex h-7 w-7 items-center justify-center rounded border border-border/80 text-muted-foreground transition-colors hover:bg-muted hover:text-foreground disabled:pointer-events-none disabled:opacity-40"
+            >
+              <svg
+                xmlns="http://www.w3.org/2000/svg"
+                viewBox="0 0 24 24"
+                fill="none"
+                stroke="currentColor"
+                strokeWidth="2"
+                className="h-3.5 w-3.5"
+              >
+                <circle cx="11" cy="11" r="8" />
+                <line x1="21" y1="21" x2="16.65" y2="16.65" />
+                <line x1="11" y1="8" x2="11" y2="14" />
+                <line x1="8" y1="11" x2="14" y2="11" />
+              </svg>
+            </button>
+            <button
+              type="button"
+              onClick={handleZoomOut}
+              disabled={
+                brushIndices.start === 0 &&
+                brushIndices.end === chartData.length - 1
+              }
+              title="Zoom out"
+              className="flex h-7 w-7 items-center justify-center rounded border border-border/80 text-muted-foreground transition-colors hover:bg-muted hover:text-foreground disabled:pointer-events-none disabled:opacity-40"
+            >
+              <svg
+                xmlns="http://www.w3.org/2000/svg"
+                viewBox="0 0 24 24"
+                fill="none"
+                stroke="currentColor"
+                strokeWidth="2"
+                className="h-3.5 w-3.5"
+              >
+                <circle cx="11" cy="11" r="8" />
+                <line x1="21" y1="21" x2="16.65" y2="16.65" />
+                <line x1="8" y1="11" x2="14" y2="11" />
+              </svg>
+            </button>
+            <button
+              type="button"
+              onClick={handleZoomReset}
+              title="Reset zoom"
+              className="flex h-7 items-center rounded border border-border/80 px-2 text-[11px] font-medium text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
+            >
+              Reset
+            </button>
+          </div>
+        </div>
+        {/* Metric toggles */}
         <div className="flex flex-wrap gap-2">
           {(
             Object.entries(METRIC_CONFIG) as [
@@ -192,8 +305,25 @@ export function ReportsChart({ readings }: { readings: Reading[] }) {
                 travellerWidth={8}
                 fill="var(--color-card)"
                 stroke="var(--color-border)"
+                startIndex={brushIndices.start}
+                endIndex={brushIndices.end}
+                onChange={(range) => {
+                  if (
+                    range &&
+                    typeof range.startIndex === "number" &&
+                    typeof range.endIndex === "number"
+                  ) {
+                    setBrushIndices({
+                      start: range.startIndex,
+                      end: range.endIndex,
+                    });
+                  }
+                }}
                 tickFormatter={(v: string) =>
-                  new Date(v).toLocaleDateString(undefined, { month: "short", day: "numeric" })
+                  new Date(v).toLocaleDateString(undefined, {
+                    month: "short",
+                    day: "numeric",
+                  })
                 }
               />
             </LineChart>

@@ -18,7 +18,11 @@ import type { Reading, Alert } from "../types";
 
 type TimeRange = "1h" | "6h" | "24h" | "custom";
 
-const PRESET_RANGES: { value: Exclude<TimeRange, "custom">; label: string; ms: number }[] = [
+const PRESET_RANGES: {
+  value: Exclude<TimeRange, "custom">;
+  label: string;
+  ms: number;
+}[] = [
   { value: "1h", label: "1 h", ms: 60 * 60 * 1000 },
   { value: "6h", label: "6 h", ms: 6 * 60 * 60 * 1000 },
   { value: "24h", label: "24 h", ms: 24 * 60 * 60 * 1000 },
@@ -88,13 +92,21 @@ export function SingleMetricChart({
   const [loading, setLoading] = useState(false);
   const [timeRange, setTimeRange] = useState<TimeRange>("1h");
   const [showAlertMarkers, setShowAlertMarkers] = useState(false);
+  const [brushIndices, setBrushIndices] = useState<{
+    start: number;
+    end: number;
+  }>({ start: 0, end: 0 });
 
   // Custom range inputs
   const defaultEnd = isoToLocalInput(new Date().toISOString());
-  const defaultStart = isoToLocalInput(new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString());
+  const defaultStart = isoToLocalInput(
+    new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString(),
+  );
   const [customStart, setCustomStart] = useState(defaultStart);
   const [customEnd, setCustomEnd] = useState(defaultEnd);
-  const [appliedCustomStart, setAppliedCustomStart] = useState<string | null>(null);
+  const [appliedCustomStart, setAppliedCustomStart] = useState<string | null>(
+    null,
+  );
   const [appliedCustomEnd, setAppliedCustomEnd] = useState<string | null>(null);
 
   const { reading: wsReading, connected } = useMonitorWebSocket(transformerId);
@@ -116,14 +128,16 @@ export function SingleMetricChart({
   // Fetch when transformer / range changes
   useEffect(() => {
     if (transformerId == null) return;
-    if (timeRange === "custom" && (!appliedCustomStart || !appliedCustomEnd)) return;
+    if (timeRange === "custom" && (!appliedCustomStart || !appliedCustomEnd))
+      return;
 
     queueMicrotask(() => setLoading(true));
     const since =
       timeRange === "custom"
         ? localInputToISO(appliedCustomStart!)
         : new Date(Date.now() - rangeMs!).toISOString();
-    const until = timeRange === "custom" ? localInputToISO(appliedCustomEnd!) : undefined;
+    const until =
+      timeRange === "custom" ? localInputToISO(appliedCustomEnd!) : undefined;
 
     fetchReadings(transformerId, since, until)
       .then((r: Reading[]) => setReadings([...r].reverse()))
@@ -165,10 +179,42 @@ export function SingleMetricChart({
     [readings, dataKey, validRange],
   );
 
+  const ZOOM_STEP = 0.25;
+  const MIN_WINDOW = 10;
+
+  // Reset brush to full range on new data.
+  useEffect(() => {
+    setBrushIndices({ start: 0, end: Math.max(0, chartData.length - 1) });
+  }, [chartData]);
+
+  const handleZoomIn = () => {
+    const len = brushIndices.end - brushIndices.start + 1;
+    if (len <= MIN_WINDOW) return;
+    const shrink = Math.max(1, Math.floor(len * ZOOM_STEP * 0.5));
+    setBrushIndices((prev) => ({
+      start: Math.min(prev.start + shrink, prev.end - MIN_WINDOW + 1),
+      end: Math.max(prev.end - shrink, prev.start + MIN_WINDOW - 1),
+    }));
+  };
+
+  const handleZoomOut = () => {
+    const len = brushIndices.end - brushIndices.start + 1;
+    const expand = Math.max(1, Math.floor(len * ZOOM_STEP * 0.5));
+    setBrushIndices((prev) => ({
+      start: Math.max(0, prev.start - expand),
+      end: Math.min(chartData.length - 1, prev.end + expand),
+    }));
+  };
+
+  const handleZoomReset = () => {
+    setBrushIndices({ start: 0, end: Math.max(0, chartData.length - 1) });
+  };
+
   // Alerts that fall within the visible time window.
   // chartData.time is already in ms; alert timestamps are converted to ms for comparison.
   const visibleAlerts = useMemo(() => {
-    if (!showAlertMarkers || alerts.length === 0 || chartData.length === 0) return [];
+    if (!showAlertMarkers || alerts.length === 0 || chartData.length === 0)
+      return [];
     const minT = Math.min(...chartData.map((d) => d.time));
     const maxT = Math.max(...chartData.map((d) => d.time));
     return alerts.filter((a) => {
@@ -224,8 +270,12 @@ export function SingleMetricChart({
           <button
             type="button"
             onClick={() => setShowAlertMarkers((v) => !v)}
-            aria-label={showAlertMarkers ? "Hide alert markers" : "Show alert markers"}
-            title={showAlertMarkers ? "Hide alert markers" : "Show alert markers"}
+            aria-label={
+              showAlertMarkers ? "Hide alert markers" : "Show alert markers"
+            }
+            title={
+              showAlertMarkers ? "Hide alert markers" : "Show alert markers"
+            }
             className={`flex items-center gap-1.5 rounded-md border px-2 py-1 text-xs font-medium transition-colors ${
               showAlertMarkers
                 ? "border-amber-500/60 bg-amber-500/10 text-amber-600 dark:text-amber-400"
@@ -249,8 +299,8 @@ export function SingleMetricChart({
           </button>
         </div>
 
-        {/* Row 2: time range buttons */}
-        <div className="flex flex-wrap items-center gap-2">
+        {/* Row 2: time range buttons + zoom controls */}
+        <div className="flex flex-wrap items-center justify-between gap-2">
           <div className="flex gap-0.5 rounded-md border border-border/80 p-0.5">
             {PRESET_RANGES.map((r) => (
               <button
@@ -278,13 +328,74 @@ export function SingleMetricChart({
               Custom
             </button>
           </div>
+          {/* Zoom controls — only visible when there's data */}
+          {chartData.length >= 10 && (
+            <div className="flex items-center gap-1">
+              <button
+                type="button"
+                onClick={handleZoomIn}
+                disabled={
+                  brushIndices.end - brushIndices.start + 1 <= MIN_WINDOW
+                }
+                title="Zoom in"
+                className="flex h-7 w-7 items-center justify-center rounded border border-border/80 text-muted-foreground transition-colors hover:bg-muted hover:text-foreground disabled:pointer-events-none disabled:opacity-40"
+              >
+                <svg
+                  xmlns="http://www.w3.org/2000/svg"
+                  viewBox="0 0 24 24"
+                  fill="none"
+                  stroke="currentColor"
+                  strokeWidth="2"
+                  className="h-3.5 w-3.5"
+                >
+                  <circle cx="11" cy="11" r="8" />
+                  <line x1="21" y1="21" x2="16.65" y2="16.65" />
+                  <line x1="11" y1="8" x2="11" y2="14" />
+                  <line x1="8" y1="11" x2="14" y2="11" />
+                </svg>
+              </button>
+              <button
+                type="button"
+                onClick={handleZoomOut}
+                disabled={
+                  brushIndices.start === 0 &&
+                  brushIndices.end === chartData.length - 1
+                }
+                title="Zoom out"
+                className="flex h-7 w-7 items-center justify-center rounded border border-border/80 text-muted-foreground transition-colors hover:bg-muted hover:text-foreground disabled:pointer-events-none disabled:opacity-40"
+              >
+                <svg
+                  xmlns="http://www.w3.org/2000/svg"
+                  viewBox="0 0 24 24"
+                  fill="none"
+                  stroke="currentColor"
+                  strokeWidth="2"
+                  className="h-3.5 w-3.5"
+                >
+                  <circle cx="11" cy="11" r="8" />
+                  <line x1="21" y1="21" x2="16.65" y2="16.65" />
+                  <line x1="8" y1="11" x2="14" y2="11" />
+                </svg>
+              </button>
+              <button
+                type="button"
+                onClick={handleZoomReset}
+                title="Reset zoom"
+                className="flex h-7 items-center rounded border border-border/80 px-2 text-[11px] font-medium text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
+              >
+                Reset
+              </button>
+            </div>
+          )}
         </div>
 
         {/* Row 3: custom date range inputs (only when custom is selected) */}
         {timeRange === "custom" && (
           <div className="flex flex-wrap items-end gap-2">
             <div className="flex flex-col gap-1">
-              <label className="text-[11px] font-medium text-muted-foreground">From</label>
+              <label className="text-[11px] font-medium text-muted-foreground">
+                From
+              </label>
               <input
                 type="datetime-local"
                 value={customStart}
@@ -294,7 +405,9 @@ export function SingleMetricChart({
               />
             </div>
             <div className="flex flex-col gap-1">
-              <label className="text-[11px] font-medium text-muted-foreground">To</label>
+              <label className="text-[11px] font-medium text-muted-foreground">
+                To
+              </label>
               <input
                 type="datetime-local"
                 value={customEnd}
@@ -341,7 +454,10 @@ export function SingleMetricChart({
                   scale="time"
                   domain={["auto", "auto"]}
                   tickFormatter={(ms: number) =>
-                    new Date(ms).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })
+                    new Date(ms).toLocaleTimeString([], {
+                      hour: "2-digit",
+                      minute: "2-digit",
+                    })
                   }
                   tick={{ fontSize: 11 }}
                   stroke="currentColor"
@@ -354,9 +470,7 @@ export function SingleMetricChart({
                   domain={yDomain ?? ["auto", "auto"]}
                 />
                 <Tooltip
-                  labelFormatter={(ms) =>
-                    new Date(Number(ms)).toLocaleString()
-                  }
+                  labelFormatter={(ms) => new Date(Number(ms)).toLocaleString()}
                   formatter={(value) => [
                     unit ? `${value} ${unit}` : value,
                     title,
@@ -397,13 +511,25 @@ export function SingleMetricChart({
                     fill="var(--color-card)"
                     stroke="var(--color-border)"
                     tickFormatter={(ms: number) =>
-                      new Date(ms).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })
+                      new Date(ms).toLocaleTimeString([], {
+                        hour: "2-digit",
+                        minute: "2-digit",
+                      })
                     }
-                    startIndex={
-                      timeRange === "custom"
-                        ? 0
-                        : Math.max(0, Math.floor(chartData.length * 0.75))
-                    }
+                    startIndex={brushIndices.start}
+                    endIndex={brushIndices.end}
+                    onChange={(range) => {
+                      if (
+                        range &&
+                        typeof range.startIndex === "number" &&
+                        typeof range.endIndex === "number"
+                      ) {
+                        setBrushIndices({
+                          start: range.startIndex,
+                          end: range.endIndex,
+                        });
+                      }
+                    }}
                   />
                 )}
               </LineChart>

@@ -1,4 +1,4 @@
-import { useState, useCallback } from "react";
+import { useState, useCallback, useEffect } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "./ui/Card";
 import { Button } from "./ui/Button";
 import { ReportsFilters, type FilterValues } from "./ReportsFilters";
@@ -74,6 +74,16 @@ export function ReportsView({
   const [alertsPage, setAlertsPage] = useState<PaginatedResponse<Alert> | null>(
     null,
   );
+  const [chartReadings, setChartReadings] = useState<Reading[]>([]);
+
+  // Clear stale data whenever the selected transformer changes.
+  useEffect(() => {
+    setFilters(null);
+    setReadingsPage(null);
+    setAlertsPage(null);
+    setChartReadings([]);
+    setPage(1);
+  }, [transformerId]);
 
   const fetchData = useCallback(
     async (f: FilterValues, t: DataTab, p: number, ps: number) => {
@@ -81,8 +91,15 @@ export function ReportsView({
       try {
         if (t === "readings") {
           const params = filtersToReadingParams(f, transformerId, p, ps);
-          const res = await fetchFilteredReadings(params);
+          // Chart fetch: up to 200 data points sorted chronologically for smooth line.
+          const chartParams = filtersToReadingParams(f, transformerId, 1, 200);
+          chartParams.ordering = "timestamp";
+          const [res, chartRes] = await Promise.all([
+            fetchFilteredReadings(params),
+            fetchFilteredReadings(chartParams),
+          ]);
           setReadingsPage(res);
+          setChartReadings(chartRes.results);
         } else {
           const params = filtersToAlertParams(f, transformerId, p, ps);
           const res = await fetchFilteredAlerts(params);
@@ -266,9 +283,9 @@ export function ReportsView({
       )}
 
       {/* Chart (readings only) */}
-      {readingsPage && readingsPage.results.length > 0 && (
+      {chartReadings.length > 0 && (
         <div className="animate-fade-in">
-          <ReportsChart readings={readingsPage.results} />
+          <ReportsChart readings={chartReadings} />
         </div>
       )}
 
