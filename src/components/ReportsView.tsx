@@ -1,9 +1,10 @@
-import { useState, useCallback, useEffect } from "react";
+import { useState, useCallback, useEffect, useMemo } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "./ui/Card";
 import { Button } from "./ui/Button";
 import { ReportsFilters, type FilterValues } from "./ReportsFilters";
 import { ReportsTable } from "./ReportsTable";
 import { ReportsChart } from "./ReportsChart";
+import { PdfReportView } from "./reports/PdfReportView";
 import {
   fetchFilteredReadings,
   fetchFilteredAlerts,
@@ -13,6 +14,7 @@ import {
 import type {
   Reading,
   Alert,
+  Transformer,
   PaginatedResponse,
   ReadingFilters,
   AlertFilters,
@@ -60,8 +62,12 @@ function filtersToAlertParams(
 
 export function ReportsView({
   transformerId,
+  transformer = null,
+  alerts: externalAlerts = [],
 }: {
   transformerId: number | null;
+  transformer?: Transformer | null;
+  alerts?: Alert[];
 }) {
   const [filters, setFilters] = useState<FilterValues | null>(null);
   const [tab, setTab] = useState<DataTab>("readings");
@@ -75,6 +81,18 @@ export function ReportsView({
     null,
   );
   const [chartReadings, setChartReadings] = useState<Reading[]>([]);
+  // Up to 2000 readings for PDF (chronological, not paginated to table page).
+  const [pdfReadings, setPdfReadings] = useState<Reading[]>([]);
+  // Deduplicated alerts for PDF: fetched alerts tab results + externally passed alerts.
+  const pdfAlerts = useMemo(() => {
+    const combined = [...(alertsPage?.results ?? []), ...externalAlerts];
+    const seen = new Set<number>();
+    return combined.filter((a) => {
+      if (seen.has(a.id)) return false;
+      seen.add(a.id);
+      return true;
+    });
+  }, [alertsPage, externalAlerts]);
 
   // Clear stale data whenever the selected transformer changes.
   useEffect(() => {
@@ -82,6 +100,7 @@ export function ReportsView({
     setReadingsPage(null);
     setAlertsPage(null);
     setChartReadings([]);
+    setPdfReadings([]);
     setPage(1);
   }, [transformerId]);
 
@@ -94,12 +113,17 @@ export function ReportsView({
           // Chart fetch: up to 200 data points sorted chronologically for smooth line.
           const chartParams = filtersToReadingParams(f, transformerId, 1, 200);
           chartParams.ordering = "timestamp";
-          const [res, chartRes] = await Promise.all([
+          // PDF fetch: up to 2000 points chronologically for complete report coverage.
+          const pdfParams = filtersToReadingParams(f, transformerId, 1, 2000);
+          pdfParams.ordering = "timestamp";
+          const [res, chartRes, pdfRes] = await Promise.all([
             fetchFilteredReadings(params),
             fetchFilteredReadings(chartParams),
+            fetchFilteredReadings(pdfParams),
           ]);
           setReadingsPage(res);
           setChartReadings(chartRes.results);
+          setPdfReadings(pdfRes.results);
         } else {
           const params = filtersToAlertParams(f, transformerId, p, ps);
           const res = await fetchFilteredAlerts(params);
@@ -278,6 +302,22 @@ export function ReportsView({
             <span className="text-xs text-muted-foreground">
               {readingsPage.count.toLocaleString()} readings found
             </span>
+          )}
+          {/* PDF report button — shown after Apply once readings data is loaded */}
+          {pdfReadings.length > 0 && (
+            <>
+              <span className="text-border mx-1 select-none">|</span>
+              <PdfReportView
+                readings={pdfReadings}
+                alerts={pdfAlerts}
+                transformer={transformer}
+                filterLabel={
+                  filters?.startDate && filters?.endDate
+                    ? `${new Date(filters.startDate).toLocaleDateString()} – ${new Date(filters.endDate).toLocaleDateString()}`
+                    : undefined
+                }
+              />
+            </>
           )}
         </div>
       )}

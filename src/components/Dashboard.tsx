@@ -306,7 +306,11 @@ export function Dashboard() {
                 title="Reports"
                 subtitle="Historical data and export"
               />
-              <ReportsView transformerId={selectedId} />
+              <ReportsView
+                transformerId={selectedId}
+                transformer={selectedTransformer ?? null}
+                alerts={alerts}
+              />
             </div>
           ) : activeTab === "users" ? (
             <div>
