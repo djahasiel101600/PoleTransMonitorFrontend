@@ -313,6 +313,36 @@ export async function fetchFilteredReadings(
   return res.json();
 }
 
+/**
+ * Fetches ALL pages of filtered readings up to `maxTotal` records, following
+ * the `next` URL returned by the paginated API.
+ *
+ * The server enforces `max_page_size = 500`, so each request uses page_size=500
+ * and we keep fetching until `next` is null or `maxTotal` is reached.
+ * This prevents the silent truncation that occurs when requesting page_size>500.
+ */
+export async function fetchAllFilteredReadings(
+  filters: Omit<ReadingFilters, "page" | "page_size">,
+  maxTotal = 5000,
+): Promise<Reading[]> {
+  const PAGE_SIZE = 500; // matches server max_page_size
+  const accumulated: Reading[] = [];
+  let page = 1;
+
+  while (accumulated.length < maxTotal) {
+    const pageFilters: ReadingFilters = { ...filters, page, page_size: PAGE_SIZE };
+    const params = buildFilterParams(pageFilters);
+    const res = await authFetch(`${API_BASE}/readings/?${params}`, {});
+    if (!res.ok) throw new Error("Failed to fetch filtered readings");
+    const data: PaginatedResponse<Reading> = await res.json();
+    accumulated.push(...data.results);
+    if (!data.next) break;
+    page += 1;
+  }
+
+  return accumulated.slice(0, maxTotal);
+}
+
 export async function fetchFilteredAlerts(
   filters: AlertFilters,
 ): Promise<PaginatedResponse<Alert>> {

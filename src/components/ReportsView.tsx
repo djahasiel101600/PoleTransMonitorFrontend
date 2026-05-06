@@ -7,6 +7,7 @@ import { ReportsChart } from "./ReportsChart";
 import { PdfReportView } from "./reports/PdfReportView";
 import {
   fetchFilteredReadings,
+  fetchAllFilteredReadings,
   fetchFilteredAlerts,
   downloadReadingsCsv,
   downloadAlertsCsv,
@@ -113,17 +114,17 @@ export function ReportsView({
           // Chart fetch: up to 200 data points sorted chronologically for smooth line.
           const chartParams = filtersToReadingParams(f, transformerId, 1, 200);
           chartParams.ordering = "timestamp";
-          // PDF fetch: up to 2000 points chronologically for complete report coverage.
-          const pdfParams = filtersToReadingParams(f, transformerId, 1, 2000);
-          pdfParams.ordering = "timestamp";
-          const [res, chartRes, pdfRes] = await Promise.all([
+          // PDF fetch: all pages up to 5000 points (500/page × 10 pages max).
+          const pdfBaseFilters = filtersToReadingParams(f, transformerId, 1, 500);
+          pdfBaseFilters.ordering = "timestamp";
+          const [res, chartRes, allPdfReadings] = await Promise.all([
             fetchFilteredReadings(params),
             fetchFilteredReadings(chartParams),
-            fetchFilteredReadings(pdfParams),
+            fetchAllFilteredReadings(pdfBaseFilters, 5000),
           ]);
           setReadingsPage(res);
           setChartReadings(chartRes.results);
-          setPdfReadings(pdfRes.results);
+          setPdfReadings(allPdfReadings);
         } else {
           const params = filtersToAlertParams(f, transformerId, p, ps);
           const res = await fetchFilteredAlerts(params);
