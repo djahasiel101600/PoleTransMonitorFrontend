@@ -131,8 +131,6 @@ export function SingleMetricChart({
     if (timeRange === "custom" && (!appliedCustomStart || !appliedCustomEnd))
       return;
 
-    // Signal the brush-reset effect to restore to full range after this fetch.
-    fullReloadPendingRef.current = true;
     queueMicrotask(() => setLoading(true));
     const since =
       timeRange === "custom"
@@ -141,8 +139,13 @@ export function SingleMetricChart({
     const until =
       timeRange === "custom" ? localInputToISO(appliedCustomEnd!) : undefined;
 
+    // Signal the brush-reset effect ONLY right before the fetched data lands,
+    // so live WS appends that arrive during the fetch do NOT consume the flag.
     fetchReadings(transformerId, since, until)
-      .then((r: Reading[]) => setReadings([...r].reverse()))
+      .then((r: Reading[]) => {
+        fullReloadPendingRef.current = true;
+        setReadings([...r].reverse());
+      })
       .catch((e: unknown) => console.error(`Failed to fetch ${title} data:`, e))
       .finally(() => setLoading(false));
   }, [transformerId, timeRange, rangeMs, appliedCustomStart, appliedCustomEnd]);
@@ -183,10 +186,10 @@ export function SingleMetricChart({
   const ZOOM_STEP = 0.25;
   const MIN_WINDOW = 10;
 
-  // Set to true whenever a full data reload is triggered (transformer/range change).
-  // Cleared after the resulting chartData update so that live appends do NOT
-  // reset the user's zoom/pan position.
-  const fullReloadPendingRef = useRef(true); // true on mount so the first load resets brush
+  // Set to true inside the fetch .then() right before setReadings — never at
+  // effect start — so that live WS appends arriving during a fetch do not
+  // prematurely consume the flag and leave the brush un-reset after the reload.
+  const fullReloadPendingRef = useRef(false);
 
   // Reset brush only on full reloads, not on live WebSocket appends.
   useEffect(() => {
