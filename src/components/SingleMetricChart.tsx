@@ -1,4 +1,4 @@
-import { useEffect, useState, useCallback, useMemo } from "react";
+import { useEffect, useRef, useState, useCallback, useMemo } from "react";
 import {
   LineChart,
   Line,
@@ -13,7 +13,7 @@ import {
 import { Card, CardContent, CardHeader, CardTitle } from "./ui/Card";
 import { Skeleton } from "./ui/Skeleton";
 import { fetchReadings } from "../api/client";
-import { useMonitorWebSocket } from "../hooks/useMonitorWebSocket";
+import { useLiveData } from "../contexts/LiveDataContext";
 import type { Reading, Alert } from "../types";
 
 type TimeRange = "1h" | "6h" | "24h" | "custom";
@@ -109,7 +109,7 @@ export function SingleMetricChart({
   );
   const [appliedCustomEnd, setAppliedCustomEnd] = useState<string | null>(null);
 
-  const { reading: wsReading, connected } = useMonitorWebSocket(transformerId);
+  const { wsReading, connected } = useLiveData();
 
   const rangeMs = useMemo(() => {
     if (timeRange === "custom") return null;
@@ -131,6 +131,8 @@ export function SingleMetricChart({
     if (timeRange === "custom" && (!appliedCustomStart || !appliedCustomEnd))
       return;
 
+    // Signal the brush-reset effect to restore to full range after this fetch.
+    fullReloadPendingRef.current = true;
     queueMicrotask(() => setLoading(true));
     const since =
       timeRange === "custom"
@@ -150,8 +152,7 @@ export function SingleMetricChart({
     if (wsReading == null || timeRange === "custom") return;
     queueMicrotask(() =>
       setReadings((prev) => {
-        const seen = new Set(prev.map((r) => r.id));
-        if (seen.has(wsReading.id)) return prev;
+        if (prev.some((r) => r.id === wsReading.id)) return prev;
         const merged = [...prev, wsReading].sort(
           (a, b) =>
             new Date(a.timestamp).getTime() - new Date(b.timestamp).getTime(),
@@ -182,41 +183,56 @@ export function SingleMetricChart({
   const ZOOM_STEP = 0.25;
   const MIN_WINDOW = 10;
 
-  // Reset brush to full range on new data.
+  // Set to true whenever a full data reload is triggered (transformer/range change).
+  // Cleared after the resulting chartData update so that live appends do NOT
+  // reset the user's zoom/pan position.
+  const fullReloadPendingRef = useRef(true); // true on mount so the first load resets brush
+
+  // Reset brush only on full reloads, not on live WebSocket appends.
   useEffect(() => {
+    if (!fullReloadPendingRef.current) return;
+    fullReloadPendingRef.current = false;
     setBrushIndices({ start: 0, end: Math.max(0, chartData.length - 1) });
   }, [chartData]);
 
-  const handleZoomIn = () => {
-    const len = brushIndices.end - brushIndices.start + 1;
-    if (len <= MIN_WINDOW) return;
-    const shrink = Math.max(1, Math.floor(len * ZOOM_STEP * 0.5));
-    setBrushIndices((prev) => ({
-      start: Math.min(prev.start + shrink, prev.end - MIN_WINDOW + 1),
-      end: Math.max(prev.end - shrink, prev.start + MIN_WINDOW - 1),
-    }));
-  };
+  const handleZoomIn = useCallback(() => {
+    setBrushIndices((prev) => {
+      const len = prev.end - prev.start + 1;
+      if (len <= MIN_WINDOW) return prev;
+      const shrink = Math.max(1, Math.floor(len * ZOOM_STEP * 0.5));
+      return {
+        start: Math.min(prev.start + shrink, prev.end - MIN_WINDOW + 1),
+        end: Math.max(prev.end - shrink, prev.start + MIN_WINDOW - 1),
+      };
+    });
+  }, []);
 
-  const handleZoomOut = () => {
-    const len = brushIndices.end - brushIndices.start + 1;
-    const expand = Math.max(1, Math.floor(len * ZOOM_STEP * 0.5));
-    setBrushIndices((prev) => ({
-      start: Math.max(0, prev.start - expand),
-      end: Math.min(chartData.length - 1, prev.end + expand),
-    }));
-  };
+  const handleZoomOut = useCallback(() => {
+    setBrushIndices((prev) => {
+      const len = prev.end - prev.start + 1;
+      const expand = Math.max(1, Math.floor(len * ZOOM_STEP * 0.5));
+      return {
+        start: Math.max(0, prev.start - expand),
+        end: Math.min(chartData.length - 1, prev.end + expand),
+      };
+    });
+  }, [chartData.length]);
 
-  const handleZoomReset = () => {
+  const handleZoomReset = useCallback(() => {
     setBrushIndices({ start: 0, end: Math.max(0, chartData.length - 1) });
-  };
+  }, [chartData.length]);
 
   // Alerts that fall within the visible time window.
   // chartData.time is already in ms; alert timestamps are converted to ms for comparison.
   const visibleAlerts = useMemo(() => {
     if (!showAlertMarkers || alerts.length === 0 || chartData.length === 0)
       return [];
-    const minT = Math.min(...chartData.map((d) => d.time));
-    const maxT = Math.max(...chartData.map((d) => d.time));
+    let minT = Infinity;
+    let maxT = -Infinity;
+    for (const d of chartData) {
+      if (d.time < minT) minT = d.time;
+      if (d.time > maxT) maxT = d.time;
+    }
     return alerts.filter((a) => {
       const t = new Date(a.timestamp).getTime();
       // eslint-disable-next-line eqeqeq

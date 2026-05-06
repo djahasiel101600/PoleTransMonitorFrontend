@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useState, useCallback, useMemo } from "react";
 import {
   fetchTransformers,
   fetchReadings,
@@ -36,6 +36,7 @@ import { UserManagementScreen } from "./UserManagementScreen";
 import { FirmwarePanel } from "./FirmwarePanel";
 import { SmsTemplatePanel } from "./SmsTemplatePanel";
 import { useToast } from "../hooks/useToast";
+import { LiveDataContext } from "../contexts/LiveDataContext";
 
 export function Dashboard() {
   const [transformers, setTransformers] = useState<Transformer[]>([]);
@@ -75,7 +76,7 @@ export function Dashboard() {
   const selectedTransformer = transformers.find((t) => t.id === selectedId);
   const { theme, toggleTheme } = useTheme();
   const uiLoading = transformersLoading || dataLoading;
-  const unacknowledgedCount = alerts.filter((a) => !a.acknowledged).length;
+  const unacknowledgedCount = useMemo(() => alerts.filter((a) => !a.acknowledged).length, [alerts]);
   const [showAddTransformer, setShowAddTransformer] = useState(false);
   const [transformerQuery, setTransformerQuery] = useState("");
   const [managementTab, setManagementTab] = useState<
@@ -111,7 +112,7 @@ export function Dashboard() {
       setActiveTab("monitoring");
   }, [isAdmin, activeTab]);
 
-  const refreshTransformers = async (preferredId?: number) => {
+  const refreshTransformers = useCallback(async (preferredId?: number) => {
     const t = (await fetchTransformers()) as Transformer[];
     setTransformers(t);
     if (typeof preferredId === "number") {
@@ -124,7 +125,7 @@ export function Dashboard() {
         return t.length ? t[0].id : null;
       });
     }
-  };
+  }, []);
 
   useEffect(() => {
     if (!isAuthenticated) return;
@@ -208,6 +209,7 @@ export function Dashboard() {
   }
 
   return (
+    <LiveDataContext.Provider value={{ wsReading, connected: deviceOnline }}>
     <div className="min-h-screen bg-background">
       <TopBar
         transformers={transformers}
@@ -541,5 +543,6 @@ export function Dashboard() {
       )}
       <Toaster toasts={toasts} onDismiss={dismiss} />
     </div>
+    </LiveDataContext.Provider>
   );
 }

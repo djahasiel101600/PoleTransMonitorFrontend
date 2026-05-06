@@ -109,14 +109,23 @@ export function AlertsList({
   );
 
   const hasMore = displayedAlerts.length < deferredFilteredAlerts.length;
-  const unacknowledgedCount = alerts.filter((a) => !a.acknowledged).length;
-  const acknowledgedCount = alerts.filter((a) => a.acknowledged).length;
-
-  const criticalCount = alerts.filter((a) =>
-    ["critical", "danger_zone", "severe_overload", "abnormal"].includes(
-      a.condition,
-    ),
-  ).length;
+  const unacknowledgedCount = useMemo(
+    () => alerts.filter((a) => !a.acknowledged).length,
+    [alerts],
+  );
+  const acknowledgedCount = useMemo(
+    () => alerts.filter((a) => a.acknowledged).length,
+    [alerts],
+  );
+  const criticalCount = useMemo(
+    () =>
+      alerts.filter((a) =>
+        ["critical", "danger_zone", "severe_overload", "abnormal"].includes(
+          a.condition,
+        ),
+      ).length,
+    [alerts],
+  );
 
   const handleLoadMore = useCallback(() => {
     setDisplayCount((c) =>
