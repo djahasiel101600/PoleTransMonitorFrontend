@@ -1,9 +1,10 @@
-import { useEffect, useState, useCallback, useMemo } from "react";
+import { useEffect, useState, useCallback, useMemo, lazy, Suspense } from "react";
 import {
   fetchTransformers,
   fetchReadings,
   fetchAlerts,
   fetchTransformerInsights,
+  fetchLatestReading,
 } from "../api/client";
 import { AlertsList } from "./AlertsList";
 import { useMonitorWebSocket } from "../hooks/useMonitorWebSocket";
@@ -19,6 +20,20 @@ import { ResetTransformerDialog } from "./ResetTransformerDialog";
 import { RebootTransformerDialog } from "./RebootTransformerDialog";
 import { TransformerManagementList } from "./TransformerManagementList";
 import { ContactsScreen } from "./ContactsScreen";
+// Heavy non-critical views are lazy-loaded so they are excluded from the
+// initial JS bundle and only downloaded when the user navigates to them.
+const ReportsView = lazy(() =>
+  import("./ReportsView").then((m) => ({ default: m.ReportsView }))
+);
+const UserManagementScreen = lazy(() =>
+  import("./UserManagementScreen").then((m) => ({ default: m.UserManagementScreen }))
+);
+const FirmwarePanel = lazy(() =>
+  import("./FirmwarePanel").then((m) => ({ default: m.FirmwarePanel }))
+);
+const SmsTemplatePanel = lazy(() =>
+  import("./SmsTemplatePanel").then((m) => ({ default: m.SmsTemplatePanel }))
+);
 import { Sidebar, type NavKey } from "./layout/Sidebar";
 import { TopBar } from "./layout/TopBar";
 import { PageHeader } from "./layout/PageHeader";
@@ -30,11 +45,9 @@ import {
 } from "./ui/Dialog";
 import { Toaster } from "./ui/Toaster";
 import { MonitoringView } from "./dashboard/MonitoringView";
-import { ReportsView } from "./ReportsView";
+// ReportsView, UserManagementScreen, FirmwarePanel, SmsTemplatePanel are lazy (above).
 import { RegisterDialog } from "./RegisterDialog";
-import { UserManagementScreen } from "./UserManagementScreen";
-import { FirmwarePanel } from "./FirmwarePanel";
-import { SmsTemplatePanel } from "./SmsTemplatePanel";
+// UserManagementScreen, FirmwarePanel, SmsTemplatePanel are lazy-loaded (see above).
 import { useToast } from "../hooks/useToast";
 import { LiveDataContext } from "../contexts/LiveDataContext";
 
@@ -155,13 +168,13 @@ export function Dashboard() {
     const since1h = new Date(Date.now() - 60 * 60 * 1000).toISOString();
     (async () => {
       try {
-        const [r, a, insights, recent] = await Promise.all([
-          fetchReadings(selectedId),
+        const [latest, a, insights, recent] = await Promise.all([
+          fetchLatestReading(selectedId),
           fetchAlerts(selectedId),
           fetchTransformerInsights(selectedId),
           fetchReadings(selectedId, since1h),
         ]);
-        setLatestReading(r[0] ?? null);
+        setLatestReading(latest ?? null);
         setAlerts(a);
         setInsights24h(insights);
         setRecentReadingsForSparkline(recent);
@@ -306,11 +319,13 @@ export function Dashboard() {
                 title="Reports"
                 subtitle="Historical data and export"
               />
-              <ReportsView
-                transformerId={selectedId}
-                transformer={selectedTransformer ?? null}
-                alerts={alerts}
-              />
+              <Suspense fallback={<div className="py-12 text-center text-sm text-muted-foreground">Loading reports…</div>}>
+                <ReportsView
+                  transformerId={selectedId}
+                  transformer={selectedTransformer ?? null}
+                  alerts={alerts}
+                />
+              </Suspense>
             </div>
           ) : activeTab === "users" ? (
             <div>
@@ -318,7 +333,9 @@ export function Dashboard() {
                 title="Users"
                 subtitle="Manage user access and approvals"
               />
-              <UserManagementScreen />
+              <Suspense fallback={<div className="py-12 text-center text-sm text-muted-foreground">Loading…</div>}>
+                <UserManagementScreen />
+              </Suspense>
             </div>
           ) : (
             /* management tab */
@@ -445,9 +462,17 @@ export function Dashboard() {
 
                   {managementTab === "contacts" && <ContactsScreen />}
 
-                  {managementTab === "firmware" && <FirmwarePanel />}
+                  {managementTab === "firmware" && (
+                    <Suspense fallback={<div className="py-8 text-center text-sm text-muted-foreground">Loading…</div>}>
+                      <FirmwarePanel />
+                    </Suspense>
+                  )}
 
-                  {managementTab === "sms_templates" && <SmsTemplatePanel />}
+                  {managementTab === "sms_templates" && (
+                    <Suspense fallback={<div className="py-8 text-center text-sm text-muted-foreground">Loading…</div>}>
+                      <SmsTemplatePanel />
+                    </Suspense>
+                  )}
                 </>
               ) : (
                 <p className="text-sm text-muted-foreground">

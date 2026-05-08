@@ -110,20 +110,99 @@ export async function fetchTransformers() {
   return res.json();
 }
 
+// ---------------------------------------------------------------------------
+// Request deduplication — prevents 7 simultaneous identical fetchReadings calls
+// from 7 chart components all computing the same time-range on initial load.
+// ---------------------------------------------------------------------------
+const _pendingReadings = new Map<string, Promise<unknown>>();
+
 export async function fetchReadings(transformerId: number, since?: string, until?: string) {
   const params = new URLSearchParams();
   params.set("transformer", String(transformerId));
   if (since) params.set("since", since);
   if (until) params.set("until", until);
-  const res = await authFetch(`${API_BASE}/readings/?${params}`, {});
-  if (!res.ok) throw new Error("Failed to fetch readings");
-  return res.json();
+
+  // Round timestamps to the nearest minute so that multiple chart instances
+  // computing "since = now - 1h" within the same second share one HTTP request.
+  const roundMin = (iso?: string) =>
+    iso ? new Date(Math.floor(new Date(iso).getTime() / 60_000) * 60_000).toISOString() : "";
+  const dedupKey = `${transformerId}:${roundMin(since)}:${roundMin(until)}`;
+
+  let deduped = _pendingReadings.get(dedupKey);
+  if (!deduped) {
+    deduped = authFetch(`${API_BASE}/readings/?${params}`, {})
+      .then((res) => {
+        if (!res.ok) throw new Error("Failed to fetch readings");
+        return res.json();
+      })
+      .finally(() => {
+        _pendingReadings.delete(dedupKey);
+      });
+    _pendingReadings.set(dedupKey, deduped);
+  }
+  return deduped;
 }
 
 export async function fetchAlerts(transformerId?: number) {
   const params = transformerId ? `?transformer=${transformerId}` : "";
   const res = await authFetch(`${API_BASE}/alerts/${params}`, {});
   if (!res.ok) throw new Error("Failed to fetch alerts");
+  return res.json();
+}
+
+/** Fetch the single most recent reading for a transformer (never loads the full table). */
+export async function fetchLatestReading(transformerId: number) {
+  const res = await authFetch(`${API_BASE}/transformers/${transformerId}/latest-reading/`, {});
+  if (!res.ok) throw new Error("Failed to fetch latest reading");
+  return res.json();
+}
+
+export interface LoadByHourResponse {
+  period: string;
+  data: Array<{ hour?: string; day?: string; loadKva: number; count: number }>;
+}
+
+/** Aggregated load data — replaces raw readings fetch for LoadByHourChart. */
+export async function fetchLoadByHour(
+  transformerId: number,
+  period: "24h" | "7d",
+): Promise<LoadByHourResponse> {
+  const res = await authFetch(
+    `${API_BASE}/transformers/${transformerId}/load-by-hour/?period=${period}`,
+    {},
+  );
+  if (!res.ok) throw new Error("Failed to fetch load-by-hour");
+  return res.json();
+}
+
+/** Aggregated 7×24 heatmap — replaces raw readings fetch for LoadHeatmap. */
+export async function fetchLoadHeatmap(
+  transformerId: number,
+): Promise<{ grid: number[][] }> {
+  const res = await authFetch(
+    `${API_BASE}/transformers/${transformerId}/load-heatmap/`,
+    {},
+  );
+  if (!res.ok) throw new Error("Failed to fetch load heatmap");
+  return res.json();
+}
+
+export interface ConditionDistributionResponse {
+  hours: number;
+  total: number;
+  counts: { normal: number; warning: number; critical: number };
+}
+
+/** Aggregated condition distribution — replaces raw readings fetch for ConditionDonut. */
+export async function fetchConditionDistribution(
+  transformerId: number,
+  hours = 24,
+): Promise<ConditionDistributionResponse> {
+  const res = await authFetch(
+    `${API_BASE}/transformers/${transformerId}/condition-distribution/?hours=${hours}`,
+    {},
+  );
+  if (!res.ok) throw new Error("Failed to fetch condition distribution");
   return res.json();
 }
 

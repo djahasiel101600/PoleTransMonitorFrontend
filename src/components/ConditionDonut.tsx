@@ -9,45 +9,11 @@ import {
 } from "recharts";
 import { Card, CardContent, CardHeader, CardTitle } from "./ui/Card";
 import { Skeleton } from "./ui/Skeleton";
-import { fetchReadings } from "../api/client";
-import type { Reading, Transformer } from "../types";
+import { fetchConditionDistribution } from "../api/client";
+import type { ConditionDistributionResponse } from "../api/client";
+import type { Transformer } from "../types";
 
 type ConditionLevel = "normal" | "warning" | "critical";
-
-function classifyReading(r: Reading, t: Transformer | null): ConditionLevel {
-  const nominalV = t?.nominal_voltage ?? 220;
-  const ratedA = t?.rated_current ?? 100;
-  const ratedVa = t ? t.rated_kva * 1000 : 15000;
-  const nominalF = t?.nominal_freq ?? 50;
-
-  let worst: ConditionLevel = "normal";
-
-  if (r.voltage != null && !Number.isNaN(r.voltage)) {
-    const low = nominalV * 0.93;
-    const high = nominalV * 1.07;
-    if (r.voltage < low || r.voltage > high) worst = "critical";
-  }
-  if (r.current != null && !Number.isNaN(r.current)) {
-    const pct = (r.current / ratedA) * 100;
-    if (pct > 125) worst = "critical";
-    else if (pct > 100 && worst === "normal") worst = "warning";
-  }
-  if (r.apparent_power != null && !Number.isNaN(r.apparent_power)) {
-    const pct = (r.apparent_power / ratedVa) * 100;
-    if (pct > 125) worst = "critical";
-    else if (pct > 100 && worst === "normal") worst = "warning";
-  }
-  if (r.power_factor != null && !Number.isNaN(r.power_factor)) {
-    if (r.power_factor < 0.7) worst = "critical";
-    else if (r.power_factor < 0.85 && worst === "normal") worst = "warning";
-  }
-  if (r.frequency != null && !Number.isNaN(r.frequency)) {
-    const diff = Math.abs(r.frequency - nominalF);
-    if (diff > 2) worst = "critical";
-    else if (diff > 1 && worst === "normal") worst = "warning";
-  }
-  return worst;
-}
 
 const COLORS: Record<ConditionLevel, string> = {
   normal: "var(--color-primary)",
@@ -57,39 +23,33 @@ const COLORS: Record<ConditionLevel, string> = {
 
 export function ConditionDonut({
   transformerId,
-  transformer,
+  // transformer prop kept for API compatibility; classification is now server-side
+  transformer: _transformer,
 }: {
   transformerId: number | null;
   transformer: Transformer | null;
 }) {
-  const [readings, setReadings] = useState<Reading[]>([]);
+  const [distribution, setDistribution] =
+    useState<ConditionDistributionResponse | null>(null);
   const [loading, setLoading] = useState(false);
 
   useEffect(() => {
     if (transformerId == null) return;
     queueMicrotask(() => setLoading(true));
-    const since = new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString();
-    fetchReadings(transformerId, since)
-      .then(setReadings)
+    fetchConditionDistribution(transformerId, 24)
+      .then((res) => setDistribution(res))
       .catch((e) => console.error("ConditionDonut:", e))
       .finally(() => setLoading(false));
   }, [transformerId]);
 
   const data = useMemo(() => {
-    const counts: Record<ConditionLevel, number> = {
-      normal: 0,
-      warning: 0,
-      critical: 0,
-    };
-    for (const r of readings) {
-      counts[classifyReading(r, transformer)] += 1;
-    }
+    if (!distribution) return [];
     return [
-      { name: "Normal", value: counts.normal, level: "normal" as const },
-      { name: "Warning", value: counts.warning, level: "warning" as const },
-      { name: "Critical", value: counts.critical, level: "critical" as const },
+      { name: "Normal", value: distribution.counts.normal, level: "normal" as const },
+      { name: "Warning", value: distribution.counts.warning, level: "warning" as const },
+      { name: "Critical", value: distribution.counts.critical, level: "critical" as const },
     ].filter((d) => d.value > 0);
-  }, [readings, transformer]);
+  }, [distribution]);
 
   if (transformerId == null) return null;
 

@@ -1,4 +1,4 @@
-import { useEffect, useState, useMemo } from "react";
+import { useEffect, useState } from "react";
 import {
   BarChart,
   Bar,
@@ -10,85 +10,31 @@ import {
 } from "recharts";
 import { Card, CardContent, CardHeader, CardTitle } from "./ui/Card";
 import { Skeleton } from "./ui/Skeleton";
-import { fetchReadings } from "../api/client";
-import type { Reading } from "../types";
+import { fetchLoadByHour } from "../api/client";
+import type { LoadByHourResponse } from "../api/client";
 
 const CHART_MARGIN = { top: 8, right: 16, left: 0, bottom: 8 };
 
-function bucketByHour(
-  readings: Reading[],
-  hours: 24 | 168,
-): { hour: string; loadKva: number; count: number }[] {
-  const buckets = Array.from({ length: hours }, (_, i) => ({
-    hour: hours === 24 ? `${i}h` : `${i}h`,
-    loadKva: 0,
-    count: 0,
-  }));
-  for (const r of readings) {
-    const ap = r.apparent_power;
-    if (ap == null || Number.isNaN(ap)) continue;
-    const d = new Date(r.timestamp);
-    const idx = hours === 24 ? d.getHours() : d.getDay() * 24 + d.getHours();
-    if (idx >= 0 && idx < hours) {
-      buckets[idx].loadKva += ap / 1000;
-      buckets[idx].count += 1;
-    }
-  }
-  for (const b of buckets) {
-    if (b.count > 0) b.loadKva = b.loadKva / b.count;
-  }
-  return buckets;
-}
-
 type Period = "24h" | "7d";
+type LoadPoint = LoadByHourResponse["data"][number];
 
 export function LoadByHourChart({
   transformerId,
 }: {
   transformerId: number | null;
 }) {
-  const [readings, setReadings] = useState<Reading[]>([]);
+  const [data, setData] = useState<LoadPoint[]>([]);
   const [loading, setLoading] = useState(false);
   const [period, setPeriod] = useState<Period>("24h");
 
   useEffect(() => {
     if (transformerId == null) return;
     queueMicrotask(() => setLoading(true));
-    const ms = period === "7d" ? 7 * 24 * 60 * 60 * 1000 : 24 * 60 * 60 * 1000;
-    const since = new Date(Date.now() - ms).toISOString();
-    fetchReadings(transformerId, since)
-      .then((r) => setReadings(r))
+    fetchLoadByHour(transformerId, period)
+      .then((res) => setData(res.data))
       .catch((e) => console.error("LoadByHourChart:", e))
       .finally(() => setLoading(false));
   }, [transformerId, period]);
-
-  const data = useMemo<
-    Array<{ hour?: string; day?: string; loadKva: number; count: number }>
-  >(() => {
-    if (period === "24h") {
-      const b = bucketByHour(readings, 24);
-      return b.map((d, i) => ({ ...d, hour: `${i}:00`, day: undefined }));
-    }
-    const b = bucketByHour(readings, 168);
-    const byDay: { day: string; loadKva: number; count: number }[] = [];
-    for (let day = 0; day < 7; day++) {
-      let sum = 0;
-      let n = 0;
-      for (let h = 0; h < 24; h++) {
-        const v = b[day * 24 + h];
-        if (v.count > 0) {
-          sum += v.loadKva;
-          n += 1;
-        }
-      }
-      byDay.push({
-        day: ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"][day],
-        loadKva: n > 0 ? sum / n : 0,
-        count: n,
-      });
-    }
-    return byDay.map((d) => ({ ...d, hour: undefined }));
-  }, [readings, period]);
 
   if (transformerId == null) return null;
 

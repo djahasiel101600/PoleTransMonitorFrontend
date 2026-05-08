@@ -1,60 +1,32 @@
 import { Fragment, useEffect, useState, useMemo } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "./ui/Card";
 import { Skeleton } from "./ui/Skeleton";
-import { fetchReadings } from "../api/client";
-import type { Reading } from "../types";
+import { fetchLoadHeatmap } from "../api/client";
 
 const DAYS = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
-
-function buildHeatmap(readings: Reading[]): number[][] {
-  const grid: number[][] = Array.from({ length: 7 }, () => Array(24).fill(0));
-  const count: number[][] = Array.from({ length: 7 }, () => Array(24).fill(0));
-  for (const r of readings) {
-    const ap = r.apparent_power;
-    if (ap == null || Number.isNaN(ap)) continue;
-    const d = new Date(r.timestamp);
-    const day = d.getDay();
-    const hour = d.getHours();
-    grid[day][hour] += ap / 1000;
-    count[day][hour] += 1;
-  }
-  for (let i = 0; i < 7; i++) {
-    for (let j = 0; j < 24; j++) {
-      if (count[i][j] > 0) grid[i][j] = grid[i][j] / count[i][j];
-    }
-  }
-  return grid;
-}
 
 export function LoadHeatmap({
   transformerId,
 }: {
   transformerId: number | null;
 }) {
-  const [readings, setReadings] = useState<Reading[]>([]);
+  const [grid, setGrid] = useState<number[][]>([]);
   const [loading, setLoading] = useState(false);
-
-  const since = useMemo(() => {
-    // Avoid `Date.now()` (react-hooks/purity) while keeping the same UTC time window.
-    const ms = new Date().getTime() - 7 * 24 * 60 * 60 * 1000;
-    return new Date(ms).toISOString();
-  }, []);
 
   useEffect(() => {
     if (transformerId == null) return;
-    // Defer state update to avoid react-hooks/set-state-in-effect linting.
     void Promise.resolve().then(() => setLoading(true));
-    fetchReadings(transformerId, since)
-      .then(setReadings)
+    fetchLoadHeatmap(transformerId)
+      .then((res) => setGrid(res.grid))
       .catch((e) => console.error("LoadHeatmap:", e))
       .finally(() => setLoading(false));
-  }, [transformerId, since]);
+  }, [transformerId]);
 
-  const grid = useMemo(() => buildHeatmap(readings), [readings]);
   const maxVal = useMemo(() => {
     let m = 0;
-    for (let i = 0; i < 7; i++)
-      for (let j = 0; j < 24; j++) if (grid[i][j] > m) m = grid[i][j];
+    for (let i = 0; i < grid.length; i++)
+      for (let j = 0; j < (grid[i]?.length ?? 0); j++)
+        if (grid[i][j] > m) m = grid[i][j];
     return m || 1;
   }, [grid]);
 

@@ -114,13 +114,13 @@ export function ReportsView({
           // Chart fetch: up to 200 data points sorted chronologically for smooth line.
           const chartParams = filtersToReadingParams(f, transformerId, 1, 200);
           chartParams.ordering = "timestamp";
-          // PDF fetch: all pages up to 5000 points (500/page × 10 pages max).
+          // PDF fetch: all pages up to 2000 points (500/page × 4 pages max).
           const pdfBaseFilters = filtersToReadingParams(f, transformerId, 1, 500);
           pdfBaseFilters.ordering = "timestamp";
           const [res, chartRes, allPdfReadings] = await Promise.all([
             fetchFilteredReadings(params),
             fetchFilteredReadings(chartParams),
-            fetchAllFilteredReadings(pdfBaseFilters, 5000),
+            fetchAllFilteredReadings(pdfBaseFilters, 2000),
           ]);
           setReadingsPage(res);
           setChartReadings(chartRes.results);
