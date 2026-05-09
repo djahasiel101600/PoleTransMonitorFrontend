@@ -472,9 +472,33 @@ const AlertCard = memo(function AlertCard({
             </span>
           </div>
           {!compact && (
-            <p className="text-sm text-foreground line-clamp-2">
-              {alert.message}
-            </p>
+            <>
+              <p className="text-sm text-foreground line-clamp-2">
+                {alert.message}
+              </p>
+              {(alert.voltage != null ||
+                alert.current != null ||
+                alert.apparent_power != null ||
+                alert.oil_temp != null) && (
+                <div className="mt-1 flex flex-wrap gap-x-3 gap-y-0.5 text-xs text-muted-foreground">
+                  {alert.voltage != null && (
+                    <span><span className="font-medium text-foreground">{alert.voltage.toFixed(1)}</span> V</span>
+                  )}
+                  {alert.current != null && (
+                    <span><span className="font-medium text-foreground">{alert.current.toFixed(2)}</span> A</span>
+                  )}
+                  {alert.apparent_power != null && (
+                    <span><span className="font-medium text-foreground">{(alert.apparent_power / 1000).toFixed(2)}</span> kVA</span>
+                  )}
+                  {alert.power_factor != null && (
+                    <span>PF <span className="font-medium text-foreground">{alert.power_factor.toFixed(2)}</span></span>
+                  )}
+                  {alert.oil_temp != null && (
+                    <span><span className="font-medium text-foreground">{alert.oil_temp.toFixed(1)}</span> °C</span>
+                  )}
+                </div>
+              )}
+            </>
           )}
         </div>
         {!alert.acknowledged && (

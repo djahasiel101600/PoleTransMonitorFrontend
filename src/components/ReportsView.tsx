@@ -115,7 +115,12 @@ export function ReportsView({
           const chartParams = filtersToReadingParams(f, transformerId, 1, 200);
           chartParams.ordering = "timestamp";
           // PDF fetch: all pages up to 2000 points (500/page × 4 pages max).
-          const pdfBaseFilters = filtersToReadingParams(f, transformerId, 1, 500);
+          const pdfBaseFilters = filtersToReadingParams(
+            f,
+            transformerId,
+            1,
+            500,
+          );
           pdfBaseFilters.ordering = "timestamp";
           const [res, chartRes, allPdfReadings] = await Promise.all([
             fetchFilteredReadings(params),

@@ -80,6 +80,15 @@ export interface Alert {
   message: string;
   sms_sent: boolean;
   acknowledged: boolean;
+  // Electrical snapshot captured when the alert was raised (all optional/nullable).
+  voltage?: number | null;
+  current?: number | null;
+  apparent_power?: number | null;
+  real_power?: number | null;
+  power_factor?: number | null;
+  frequency?: number | null;
+  oil_temp?: number | null;
+  energy_kwh?: number | null;
 }
 
 // ---------------------------------------------------------------------------

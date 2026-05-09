@@ -366,7 +366,7 @@ export function PdfReportView({ readings, alerts, transformer, filterLabel }: Pd
           <table style={{ width: "100%", borderCollapse: "collapse", fontSize: 11 }}>
             <thead>
               <tr style={{ borderBottom: "2px solid #e2e8f0" }}>
-                {["Time", "Condition", "Message", "SMS Sent", "Acknowledged"].map((h) => (
+                {["Time", "Condition", "Message", "Voltage (V)", "Current (A)", "Load (kVA)", "Oil Temp (°C)", "SMS Sent", "Ack"].map((h) => (
                   <th key={h} style={{ textAlign: "left", padding: "4px 8px", color: "#64748b", fontWeight: 600 }}>{h}</th>
                 ))}
               </tr>
@@ -374,9 +374,13 @@ export function PdfReportView({ readings, alerts, transformer, filterLabel }: Pd
             <tbody>
               {alerts.slice(0, 200).map((a, i) => (
                 <tr key={a.id} style={{ background: i % 2 === 0 ? "#f8fafc" : "#ffffff", borderBottom: "1px solid #f1f5f9" }}>
-                  <td style={{ padding: "4px 8px" }}>{new Date(a.timestamp).toLocaleString()}</td>
+                  <td style={{ padding: "4px 8px", whiteSpace: "nowrap" }}>{new Date(a.timestamp).toLocaleString()}</td>
                   <td style={{ padding: "4px 8px", fontWeight: 600 }}>{a.condition.replace(/_/g, " ")}</td>
-                  <td style={{ padding: "4px 8px", maxWidth: 260, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{a.message}</td>
+                  <td style={{ padding: "4px 8px", maxWidth: 200, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{a.message}</td>
+                  <td style={{ padding: "4px 8px" }}>{a.voltage != null ? a.voltage.toFixed(1) : "—"}</td>
+                  <td style={{ padding: "4px 8px" }}>{a.current != null ? a.current.toFixed(2) : "—"}</td>
+                  <td style={{ padding: "4px 8px" }}>{a.apparent_power != null ? (a.apparent_power / 1000).toFixed(2) : "—"}</td>
+                  <td style={{ padding: "4px 8px" }}>{a.oil_temp != null ? a.oil_temp.toFixed(1) : "—"}</td>
                   <td style={{ padding: "4px 8px" }}>{a.sms_sent ? "Yes" : "No"}</td>
                   <td style={{ padding: "4px 8px" }}>{a.acknowledged ? "Yes" : "No"}</td>
                 </tr>

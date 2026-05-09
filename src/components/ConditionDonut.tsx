@@ -45,9 +45,21 @@ export function ConditionDonut({
   const data = useMemo(() => {
     if (!distribution) return [];
     return [
-      { name: "Normal", value: distribution.counts.normal, level: "normal" as const },
-      { name: "Warning", value: distribution.counts.warning, level: "warning" as const },
-      { name: "Critical", value: distribution.counts.critical, level: "critical" as const },
+      {
+        name: "Normal",
+        value: distribution.counts.normal,
+        level: "normal" as const,
+      },
+      {
+        name: "Warning",
+        value: distribution.counts.warning,
+        level: "warning" as const,
+      },
+      {
+        name: "Critical",
+        value: distribution.counts.critical,
+        level: "critical" as const,
+      },
     ].filter((d) => d.value > 0);
   }, [distribution]);
 

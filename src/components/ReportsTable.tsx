@@ -223,6 +223,10 @@ function AlertsTableContent({ alerts }: { alerts: Alert[] }) {
           <th className={TH}>Transformer</th>
           <th className={TH}>Condition</th>
           <th className={TH}>Message</th>
+          <th className={TH}>Voltage (V)</th>
+          <th className={TH}>Current (A)</th>
+          <th className={TH}>Load (kVA)</th>
+          <th className={TH}>Oil Temp (°C)</th>
           <th className={TH}>SMS Sent</th>
           <th className={TH}>Acknowledged</th>
         </tr>
@@ -239,6 +243,10 @@ function AlertsTableContent({ alerts }: { alerts: Alert[] }) {
               <ConditionBadge condition={a.condition} />
             </td>
             <td className={TD + " max-w-[300px] truncate"}>{a.message}</td>
+            <td className={TD}>{a.voltage != null ? a.voltage.toFixed(1) : "—"}</td>
+            <td className={TD}>{a.current != null ? a.current.toFixed(2) : "—"}</td>
+            <td className={TD}>{a.apparent_power != null ? (a.apparent_power / 1000).toFixed(2) : "—"}</td>
+            <td className={TD}>{a.oil_temp != null ? a.oil_temp.toFixed(1) : "—"}</td>
             <td className={TD}>{a.sms_sent ? "Yes" : "No"}</td>
             <td className={TD}>{a.acknowledged ? "Yes" : "No"}</td>
           </tr>
